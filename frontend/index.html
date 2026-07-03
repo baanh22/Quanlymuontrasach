@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Nhà Sách</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon"><i class="fa-solid fa-book-open"></i></div>
+                <div class="brand-text">
+                    <h2>Nhà Sách</h2>
+                    <span>Hệ Thống Quản Lý</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Tổng quan</div>
+                <a href="#/dashboard" class="nav-item" data-route="/dashboard">
+                    <i class="fa-solid fa-house"></i> <span>Dashboard</span>
+                </a>
+
+                <div class="nav-section-title">Quản lý kho & Bán hàng</div>
+                <a href="#/sach" class="nav-item" data-route="/sach">
+                    <i class="fa-solid fa-book"></i> <span>Danh mục Sách</span>
+                </a>
+                <a href="#/khachhang" class="nav-item" data-route="/khachhang">
+                    <i class="fa-solid fa-users"></i> <span>Khách Hàng</span>
+                </a>
+                <a href="#/hoadon" class="nav-item" data-route="/hoadon">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> <span>Lập Hóa Đơn</span>
+                </a>
+                <a href="#/phieuthu" class="nav-item" data-route="/phieuthu">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> <span>Lập Phiếu Thu Tiền</span>
+                </a>
+                <a href="#/nhapsach" class="nav-item" data-route="/nhapsach">
+                    <i class="fa-solid fa-truck-moving"></i> <span>Nhập Sách</span>
+                </a>
+
+                <div class="nav-section-title">Báo Cáo Thống Kê</div>
+                <a href="#/baocaoton" class="nav-item" data-route="/baocaoton">
+                    <i class="fa-solid fa-box-archive"></i> <span>Báo Cáo Tồn Kho</span>
+                </a>
+                <a href="#/baocaocongno" class="nav-item" data-route="/baocaocongno">
+                    <i class="fa-solid fa-file-invoice"></i> <span>Báo Cáo Công Nợ</span>
+                </a>
+
+                <div class="nav-section-title">Hệ thống</div>
+                <a href="#/nhanvien" class="nav-item" data-route="/nhanvien">
+                    <i class="fa-solid fa-user-tie"></i> <span>Quản Lý Nhân Viên</span>
+                </a>
+                <a href="#/cauhinh" class="nav-item" data-route="/cauhinh">
+                    <i class="fa-solid fa-gear"></i> <span>Cấu Hình Quy Định</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-user">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div class="user-info">
+                    <div class="name" id="userName">Admin</div>
+                    <div class="role" id="userRole">Quản trị viên</div>
+                </div>
+                <button class="btn-logout" id="btnLogout" title="Đăng xuất">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-area">
+            <div class="topbar">
+                <button class="btn btn-secondary btn-sm" id="btnToggleMenu" style="margin-right:8px; display:none;">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </div>
+            <div class="page-content" id="appContent">
+                <!-- Nội dung các trang sẽ load vào đây -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/pages/dashboard.js"></script>
+    <script src="js/pages/sach.js"></script>
+    <script src="js/pages/khachhang.js"></script>
+    <script src="js/pages/hoadon.js"></script>
+    <script src="js/pages/nhapsach.js"></script>
+    <script src="js/pages/phieuthu.js"></script>
+    <script src="js/pages/baocao.js"></script>
+    <script src="js/pages/nhanvien.js"></script>
+    <script src="js/pages/cauhinh.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
