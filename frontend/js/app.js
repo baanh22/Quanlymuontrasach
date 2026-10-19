@@ -1,146 +1,80 @@
-// ===== app.js =====
-// Core SPA Router và Utility Functions
-
 const DOM = {
     content: document.getElementById('appContent'),
     loading: document.getElementById('loadingOverlay'),
-    navItems: document.querySelectorAll('.nav-item'),
-    btnLogout: document.getElementById('btnLogout'),
-    userName: document.getElementById('userName'),
-    userRole: document.getElementById('userRole'),
-    userAvatar: document.getElementById('userAvatar'),
-    sidebar: document.getElementById('sidebar'),
-    btnToggleMenu: document.getElementById('btnToggleMenu')
+    headerName: document.getElementById('headerName'),
+    headerRole: document.getElementById('headerRole'),
+    employeesNav: document.getElementById('employeesNav'),
+    navLinks: document.querySelectorAll('.nav-link'),
+    logoutButton: document.getElementById('logoutButton')
 };
 
-// --- Utilities ---
-function showLoading(show) { show ? DOM.loading.classList.add('show') : DOM.loading.classList.remove('show'); }
-function setContent(html) { DOM.content.innerHTML = html; }
-function setPageTitle(title) { document.title = title + ' | Quản Lý Nhà Sách'; }
-function escapeHtml(str) { return String(str).replace(/[&<>"']/g, m => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#039;'}[m])); }
+let currentUser = null;
 
-// Fake jQuery html to DOM element
-function htmlToElement(html) {
-    const template = document.createElement('template');
-    template.innerHTML = html.trim();
-    return template.content.firstChild;
+function showLoading(show) {
+    DOM.loading.classList.toggle('show', show);
 }
 
-// Hàm xuất Table ra Excel (CSV format)
-function exportTableToExcel(tableId, filename = '') {
-    const table = document.getElementById(tableId);
-    if (!table) return;
-
-    let csv = [];
-    const rows = table.querySelectorAll('tr');
-    
-    for (const row of rows) {
-        let rowData = [];
-        const cols = row.querySelectorAll('td, th');
-        for (const col of cols) {
-            // Loại bỏ khoảng trắng thừa và dấu phẩy, \n
-            let text = col.innerText.trim();
-            // Wrap text in quotes if it contains commas
-            if (text.includes(',')) text = '"' + text + '"';
-            rowData.push(text);
-        }
-        csv.push(rowData.join(','));
-    }
-
-    const csvFile = new Blob(["\\uFEFF" + csv.join('\\n')], { type: "text/csv;charset=utf-8;" });
-    const downloadLink = document.createElement("a");
-    downloadLink.download = filename ? filename + '.csv' : 'export.csv';
-    downloadLink.href = window.URL.createObjectURL(csvFile);
-    downloadLink.style.display = "none";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+function setContent(html) {
+    DOM.content.innerHTML = html;
 }
 
-// Global modal builder
-function showModal(title, bodyHtml, footerHtml) {
-    const existing = document.getElementById('appModal');
-    if (existing) existing.remove();
-    
-    const m = document.createElement('div');
-    m.className = 'modal-overlay';
-    m.id = 'appModal';
-    m.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title">${title}</div>
-                <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body">${bodyHtml}</div>
-            <div class="modal-footer">${footerHtml}</div>
-        </div>
-    `;
-    document.body.appendChild(m);
-    setTimeout(() => m.classList.add('show'), 10);
+function setPageTitle(title) {
+    document.title = `${title} | Quản lý nhà sách`;
 }
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    }[char]));
+}
+
+function showModal(title, body, footer) {
+    closeModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'appModal';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<section class="modal" role="dialog" aria-modal="true"><header class="modal-header"><h2>${escapeHtml(title)}</h2><button class="icon-button" aria-label="Đóng" onclick="closeModal()">×</button></header><div class="modal-body">${body}</div><footer class="modal-footer">${footer}</footer></section>`;
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) closeModal(); });
+    document.body.appendChild(overlay);
+}
+
 function closeModal() {
-    const m = document.getElementById('appModal');
-    if (!m) return;
-    m.classList.remove('show');
-    setTimeout(() => m.remove(), 250);
+    document.getElementById('appModal')?.remove();
 }
 
-// --- Routing ---
 const routes = {
-    '/dashboard': renderDashboard,
-    '/sach':      renderSach,
-    '/khachhang': renderKhachHang,
-    '/hoadon':    renderHoaDon,
-    '/nhapsach':  renderNhapSach,
-    '/phieuthu':  renderPhieuThu,
-    '/baocaoton': renderBaoCaoTon,
-    '/baocaocongno': renderBaoCaoCongNo,
-    '/nhanvien':  renderNhanVien,
-    '/cauhinh':   renderCauHinh
+    '/account': renderAccount,
+    '/employees': renderEmployees
 };
 
 function handleRoute() {
-    let hash = window.location.hash.replace('#', '') || '/dashboard';
-    if (!routes[hash]) hash = '/dashboard';
-    
-    DOM.navItems.forEach(n => {
-        n.classList.remove('active');
-        if (n.getAttribute('data-route') === hash) n.classList.add('active');
-    });
-
-    // Gọi render function của trang
-    routes[hash]();
-    if(window.innerWidth <= 768) DOM.sidebar.classList.remove('open');
+    let route = window.location.hash.slice(1) || '/account';
+    if (!routes[route] || (route === '/employees' && currentUser?.role !== 'Admin')) route = '/account';
+    window.location.hash = route;
+    DOM.navLinks.forEach((link) => link.classList.toggle('active', link.dataset.route === route));
+    routes[route]();
 }
 
-// --- Init & Auth ---
 async function initApp() {
     showLoading(true);
-    const userRes = await api.me();
-    if (!userRes || !userRes.success) return; // API module sẽ tự redirect sang login
-
-    const u = userRes.data;
-    DOM.userName.textContent = u.fullName;
-    DOM.userName.dataset.username = u.username;
-    DOM.userRole.textContent = u.role;
-    DOM.userAvatar.textContent = u.fullName.charAt(0).toUpperCase();
-
-    // Responsive toggle
-    DOM.btnToggleMenu.addEventListener('click', () => DOM.sidebar.classList.toggle('open'));
-    if(window.innerWidth <= 768) DOM.btnToggleMenu.style.display = 'block';
-
+    const response = await api.me();
+    if (!response?.success) return;
+    currentUser = response.data;
+    DOM.headerName.textContent = currentUser.fullName;
+    DOM.headerRole.textContent = currentUser.role === 'Admin' ? 'Quản trị viên' : 'Nhân viên';
+    DOM.employeesNav.hidden = currentUser.role !== 'Admin';
+    DOM.navLinks.forEach((link) => link.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.location.hash = link.dataset.route;
+    }));
+    DOM.logoutButton.addEventListener('click', async () => {
+        if (!confirm('Bạn muốn đăng xuất khỏi hệ thống?')) return;
+        await api.logout();
+        window.location.href = 'login.html';
+    });
     window.addEventListener('hashchange', handleRoute);
     handleRoute();
-    
     showLoading(false);
 }
 
-DOM.btnLogout.addEventListener('click', async () => {
-    if(confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-        await api.logout();
-        window.location.href = 'login.html';
-    }
-});
-
-// Chạy luôn
 initApp();

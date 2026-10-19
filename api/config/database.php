@@ -1,48 +1,50 @@
 <?php
-// Cấu hình CORS để Frontend có thể gọi API
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json; charset=UTF-8');
 
-// Xử lý preflight OPTIONS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    session_set_cookie_params([
+        'httponly' => true,
+        'secure' => $isHttps,
+        'samesite' => 'Lax',
+        'path' => '/',
+    ]);
+    session_start();
 }
 
-session_start();
-
-$host = 'db';
+$host = '127.0.0.1';
 $user = 'root';
-$pass = 'root';
-$db   = 'QuanLyNhaSach';
+$pass = '';
+$db = 'QuanLyNhaSach_Nguoi1';
 
 try {
-    $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Lỗi kết nối cơ sở dữ liệu: ' . $e->getMessage()
-    ]);
+    echo json_encode(['success' => false, 'message' => 'Khong the ket noi database.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-// Hàm tiện ích trả về JSON
-function json_response($data, $code = 200) {
-    http_response_code($code);
+function json_response($data, $status = 200) {
+    http_response_code($status);
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function json_success($data = [], $message = 'Thành công') {
+function json_success($data = [], $message = 'Thanh cong') {
     json_response(['success' => true, 'message' => $message, 'data' => $data]);
 }
 
-function json_error($message = 'Có lỗi xảy ra', $code = 400) {
-    json_response(['success' => false, 'message' => $message], $code);
+function json_error($message = 'Co loi xay ra', $status = 400) {
+    json_response(['success' => false, 'message' => $message], $status);
 }
-?>
+
+function read_json_body() {
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($body)) json_error('Du lieu gui len khong hop le.');
+    return $body;
+}
