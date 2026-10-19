@@ -2,7 +2,7 @@
 
 async function renderHoaDon() {
     setPageTitle('Lập Hóa Đơn');
-    
+
     // Load rules, KH, Sach for form
     const [rulesRes, khRes, sachRes, hdRes] = await Promise.all([
         api.getCauHinh(),
@@ -10,28 +10,28 @@ async function renderHoaDon() {
         api.getSach(),
         api.getHoaDon()
     ]);
-    
+
     const r = rulesRes?.data || {};
     const khs = khRes?.data || [];
     const sachs = sachRes?.data || [];
     const hds = hdRes?.data || [];
-    
+
     const fmt = n => new Intl.NumberFormat('vi-VN').format(n);
-    
+
     // Build options
     const khOpts = khs.map(k => `<option value="${k.MaKhachHang}">${k.HoTenKhachHang} (Nợ: ${fmt(k.SoTienNo)}đ)</option>`).join('');
     const sachOpts = sachs.map(s => `<option value="${s.MaSach}">${s.TenSach} (Tồn: ${s.SoLuongTon} | Giá mới: ${fmt(s.DonGia * r.DonGiaBanYeuCau)}đ)</option>`).join('');
-    
+
     // Build HD history table
-    const hdRows = hds.length === 0 
+    const hdRows = hds.length === 0
         ? `<tr><td colspan="5" style="text-align:center">Chưa có hóa đơn nào</td></tr>`
         : hds.map(h => `
             <tr>
                 <td><span class="badge">HD${h.MaPhieuHoaDon}</span></td>
                 <td>${h.NgayLapHoaDon}</td>
-                <td style="font-weight:500">${escapeHtml(h.HoTenKhachHang)}</td>
-                <td>${escapeHtml(h.DanhSachSach)}</td>
-                <td><span class="badge info">${h.TongSoLuong} cuốn</span></td>
+                <td style="font-weight:500">${escapeHtml(h.HoTenKhachHang) || '<span style="color:var(--text-muted)">Không rõ</span>'}</td>
+                <td>${escapeHtml(h.DanhSachSach) || '<span style="color:var(--text-muted)">Chưa có mặt hàng</span>'}</td>
+                <td><span class="badge info">${h.TongSoLuong || 0} cuốn</span></td>
             </tr>
         `).join('');
 
@@ -112,15 +112,15 @@ async function submitHoaDon() {
         MaSach: document.getElementById('hdSach').value,
         SoLuong: parseInt(document.getElementById('hdSoLuong').value)
     };
-    
+
     showLoading(true);
     const res = await api.addHoaDon(data);
     showLoading(false);
-    
+
     const msg = document.getElementById('msgHoaDon');
     msg.classList.remove('alert-hidden', 'success', 'error');
-    
-    if(res.success) {
+
+    if (res.success) {
         msg.classList.add('success');
         msg.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${res.message}`;
         setTimeout(() => renderHoaDon(), 2000);

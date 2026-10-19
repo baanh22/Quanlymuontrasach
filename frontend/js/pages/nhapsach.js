@@ -23,9 +23,9 @@ async function renderNhapSach() {
             <tr>
                 <td><span class="badge">PN${p.MaPhieuNhap}</span></td>
                 <td>${p.NgayNhap}</td>
-                <td style="font-weight:500">${escapeHtml(p.DanhSachSach)}</td>
-                <td><span class="badge info">${p.TongSoLuong} cuốn</span></td>
-                <td style="color:var(--danger);font-weight:600">-${fmt(p.TongTien)}đ</td>
+                <td style="font-weight:500">${escapeHtml(p.DanhSachSach) || '<span style="color:var(--text-muted)">Chưa có mặt hàng</span>'}</td>
+                <td><span class="badge info">${p.TongSoLuong || 0} cuốn</span></td>
+                <td style="color:var(--danger);font-weight:600">-${fmt(p.TongTien || 0)}đ</td>
             </tr>
         `).join('');
 

@@ -17,7 +17,10 @@ const DOM = {
 function showLoading(show) { show ? DOM.loading.classList.add('show') : DOM.loading.classList.remove('show'); }
 function setContent(html) { DOM.content.innerHTML = html; }
 function setPageTitle(title) { document.title = title + ' | Quản Lý Nhà Sách'; }
-function escapeHtml(str) { return String(str).replace(/[&<>"']/g, m => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#039;'}[m])); }
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, m => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#039;'}[m]));
+}
 
 // Fake jQuery html to DOM element
 function htmlToElement(html) {
