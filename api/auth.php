@@ -6,68 +6,80 @@ $action = $_GET['action'] ?? '';
 
 switch ($action) {
     case 'login':
-        handleLogin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Hay dung POST de dang nhap.', 405);
+        handle_login();
         break;
     case 'logout':
-        handleLogout();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Hay dung POST de dang xuat.', 405);
+        handle_logout();
         break;
     case 'me':
-        handleMe();
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('Hay dung GET de lay tai khoan.', 405);
+        handle_me();
         break;
     default:
-        json_error('Action không hợp lệ', 404);
+        json_error('Action khong hop le.', 404);
 }
 
-function handleLogin() {
+function handle_login() {
     global $conn;
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        json_error('Phương thức không hợp lệ. Dùng POST.', 405);
-    }
-
-    $raw = file_get_contents('php://input');
-    file_put_contents(__DIR__ . '/debug_login.txt', date('Y-m-d H:i:s') . " - RAW: " . $raw . "\n", FILE_APPEND);
-
-    $body = json_decode($raw, true);
+    $body = read_json_body();
     $username = trim($body['username'] ?? '');
-    $password = trim($body['password'] ?? '');
-
-    if (!$username || !$password) {
-        json_error('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+    $password = $body['password'] ?? '';
+    if ($username === '' || !is_string($password) || $password === '') {
+        json_error('Hay nhap ten dang nhap va mat khau.');
     }
 
-    $stmt = $conn->prepare("SELECT * FROM TAIKHOAN WHERE Username = ?");
+    $stmt = $conn->prepare('SELECT Username, Password, FullName, Role FROM TAIKHOAN WHERE Username = ?');
     $stmt->execute([$username]);
     $user = $stmt->fetch();
+    if (!$user) json_error('Ten dang nhap hoac mat khau khong dung.', 401);
 
-    // So sánh MD5 (đang dùng md5 theo database.sql)
-    if (!$user || $user['Password'] !== md5($password)) {
-        json_error('Tên đăng nhập hoặc mật khẩu không đúng.', 401);
+    $storedPassword = (string)$user['Password'];
+    $valid = password_verify($password, $storedPassword);
+    $isLegacyMd5 = preg_match('/^[a-f0-9]{32}$/i', $storedPassword) === 1;
+    if (!$valid && $isLegacyMd5) {
+        $valid = hash_equals(strtolower($storedPassword), md5($password));
+        if ($valid) {
+            $upgrade = $conn->prepare('UPDATE TAIKHOAN SET Password = ? WHERE Username = ?');
+            $upgrade->execute([password_hash($password, PASSWORD_DEFAULT), $username]);
+        }
     }
+    if (!$valid) json_error('Ten dang nhap hoac mat khau khong dung.', 401);
 
-    $_SESSION['user_id']   = $user['Username'];
+    session_regenerate_id(true);
+    $_SESSION['user_id'] = $user['Username'];
     $_SESSION['user_name'] = $user['FullName'];
     $_SESSION['user_role'] = $user['Role'];
-
-    json_success([
-        'username' => $user['Username'],
-        'fullName' => $user['FullName'],
-        'role'     => $user['Role'],
-    ], 'Đăng nhập thành công!');
+    json_success(public_user($user), 'Dang nhap thanh cong.');
 }
 
-function handleLogout() {
-    session_destroy();
-    json_success([], 'Đăng xuất thành công.');
-}
-
-function handleMe() {
-    if (!isset($_SESSION['user_id'])) {
-        json_error('Chưa đăng nhập.', 401);
+function handle_logout() {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires' => time() - 42000,
+            'path' => $params['path'],
+            'domain' => $params['domain'],
+            'secure' => $params['secure'],
+            'httponly' => $params['httponly'],
+            'samesite' => $params['samesite'] ?? 'Lax',
+        ]);
     }
+    session_destroy();
+    json_success([], 'Dang xuat thanh cong.');
+}
+
+function handle_me() {
+    require_auth();
     json_success([
         'username' => $_SESSION['user_id'],
         'fullName' => $_SESSION['user_name'],
-        'role'     => $_SESSION['user_role'],
+        'role' => $_SESSION['user_role'],
     ]);
 }
-?>
+
+function public_user($user) {
+    return ['username' => $user['Username'], 'fullName' => $user['FullName'], 'role' => $user['Role']];
+}

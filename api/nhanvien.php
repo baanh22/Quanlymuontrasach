@@ -1,114 +1,88 @@
 <?php
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
-require_auth();
+require_admin();
 
-$method = $_SERVER['REQUEST_METHOD'];
+switch ($_SERVER['REQUEST_METHOD']) {
+    case 'GET':
+        $stmt = $conn->query('SELECT Username, FullName, Role FROM TAIKHOAN ORDER BY Role ASC, Username ASC');
+        json_success($stmt->fetchAll());
+        break;
 
-switch ($method) {
-    case 'GET':  getNhanVien();  break;
-    case 'POST': addNhanVien();  break;
-    case 'PUT':  updateNhanVien(); break;
-    case 'DELETE': deleteNhanVien(); break;
-    default: json_error('Phương thức không hợp lệ', 405);
-}
+    case 'POST':
+        $body = read_json_body();
+        $username = trim($body['Username'] ?? '');
+        $password = $body['Password'] ?? '';
+        $fullName = trim($body['FullName'] ?? '');
+        $role = valid_role($body['Role'] ?? 'User');
+        if (!preg_match('/^[a-zA-Z0-9._-]{3,40}$/', $username)) json_error('Username can tu 3-40 ky tu, chi gom chu, so, cham, gach ngang hoac gach duoi.');
+        if (!is_string($password) || strlen($password) < 8) json_error('Mat khau phai co it nhat 8 ky tu.');
+        if ($fullName === '') json_error('Ho ten khong duoc de trong.');
+        if (!$role) json_error('Quyen tai khoan khong hop le.');
 
-function getNhanVien() {
-    global $conn;
-    // Không trả về Password ra ngoài Front-end
-    $sql = "SELECT Username, FullName, Role FROM TAIKHOAN ORDER BY Role ASC, Username ASC";
-    $stmt = $conn->query($sql);
-    json_success($stmt->fetchAll());
-}
+        $stmt = $conn->prepare('INSERT INTO TAIKHOAN (Username, Password, FullName, Role) VALUES (?, ?, ?, ?)');
+        try {
+            $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullName, $role]);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') json_error('Username da ton tai.');
+            json_error('Khong the tao tai khoan.', 500);
+        }
+        json_success([], 'Tao tai khoan nhan vien thanh cong.');
+        break;
 
-function addNhanVien() {
-    global $conn;
-    $body = json_decode(file_get_contents('php://input'), true);
-    
-    $username = trim($body['Username'] ?? '');
-    $password = trim($body['Password'] ?? '');
-    $fullName = trim($body['FullName'] ?? '');
-    $role     = trim($body['Role'] ?? 'User');
+    case 'PUT':
+        $username = trim($_GET['id'] ?? '');
+        $body = read_json_body();
+        $fullName = trim($body['FullName'] ?? '');
+        $role = valid_role($body['Role'] ?? 'User');
+        $password = $body['Password'] ?? '';
+        if ($username === '') json_error('Thieu username.');
+        if ($fullName === '') json_error('Ho ten khong duoc de trong.');
+        if (!$role) json_error('Quyen tai khoan khong hop le.');
+        if (!is_string($password)) json_error('Mat khau khong hop le.');
+        if ($password !== '' && strlen($password) < 8) json_error('Mat khau moi phai co it nhat 8 ky tu.');
+        if ($username === $_SESSION['user_id'] && $role !== 'Admin') json_error('Ban khong the tu ha quyen Admin cua minh.');
 
-    if (!$username || !$password || !$fullName) {
-        json_error('Vui lòng nhập đầy đủ Username, Password và Họ Tên.');
-    }
+        $exists = $conn->prepare('SELECT 1 FROM TAIKHOAN WHERE Username = ?');
+        $exists->execute([$username]);
+        if (!$exists->fetchColumn()) json_error('Khong tim thay tai khoan.', 404);
+        if ($role !== 'Admin') protect_last_admin($conn, $username);
 
-    // Check account exists
-    $check = $conn->prepare("SELECT Username FROM TAIKHOAN WHERE Username = ?");
-    $check->execute([$username]);
-    if ($check->rowCount() > 0) {
-        json_error('Tên đăng nhập (Username) này đã tồn tại trong hệ thống.');
-    }
-
-    try {
-        $stmt = $conn->prepare("INSERT INTO TAIKHOAN (Username, Password, FullName, Role) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$username, md5($password), $fullName, $role]);
-        json_success([], 'Tạo tài khoản nhân viên thành công!');
-    } catch (Exception $e) {
-        json_error('Lỗi hệ thống: ' . $e->getMessage(), 500);
-    }
-}
-
-function updateNhanVien() {
-    global $conn;
-    $body = json_decode(file_get_contents('php://input'), true);
-    $username = trim($_GET['id'] ?? '');
-    
-    if (!$username) json_error('Thiếu mã Username.');
-
-    $fullName = trim($body['FullName'] ?? '');
-    $role     = trim($body['Role'] ?? 'User');
-    $password = trim($body['Password'] ?? '');
-
-    if (!$fullName) {
-        json_error('Họ tên không được để trống.');
-    }
-
-    try {
         if ($password !== '') {
-            // Sửa cả password
-            $stmt = $conn->prepare("UPDATE TAIKHOAN SET FullName = ?, Role = ?, Password = ? WHERE Username = ?");
-            $stmt->execute([$fullName, $role, md5($password), $username]);
+            $stmt = $conn->prepare('UPDATE TAIKHOAN SET FullName = ?, Role = ?, Password = ? WHERE Username = ?');
+            $stmt->execute([$fullName, $role, password_hash($password, PASSWORD_DEFAULT), $username]);
         } else {
-            // Chỉ sửa thông tin
-            $stmt = $conn->prepare("UPDATE TAIKHOAN SET FullName = ?, Role = ? WHERE Username = ?");
+            $stmt = $conn->prepare('UPDATE TAIKHOAN SET FullName = ?, Role = ? WHERE Username = ?');
             $stmt->execute([$fullName, $role, $username]);
         }
-        
-        // Cập nhật lại session nếu người đó tự sửa chính mình
-        if ($_SESSION['user_id'] === $username) {
-            $_SESSION['user_name'] = $fullName;
-            $_SESSION['user_role'] = $role;
-        }
+        if ($username === $_SESSION['user_id']) $_SESSION['user_name'] = $fullName;
+        json_success([], 'Cap nhat nhan vien thanh cong.');
+        break;
 
-        json_success([], 'Cập nhật thông tin nhân viên thành công!');
-    } catch (Exception $e) {
-        json_error('Lỗi hệ thống: ' . $e->getMessage(), 500);
-    }
-}
-
-function deleteNhanVien() {
-    global $conn;
-    $username = trim($_GET['id'] ?? '');
-    
-    if (!$username) json_error('Thiếu mã Username.');
-    
-    if ($username === $_SESSION['user_id']) {
-        json_error('Bạn không thể tự xóa tài khoản của chính mình.');
-    }
-
-    try {
-        $stmt = $conn->prepare("DELETE FROM TAIKHOAN WHERE Username = ?");
+    case 'DELETE':
+        $username = trim($_GET['id'] ?? '');
+        if ($username === '') json_error('Thieu username.');
+        if ($username === $_SESSION['user_id']) json_error('Ban khong the xoa tai khoan dang dang nhap.');
+        $exists = $conn->prepare('SELECT Role FROM TAIKHOAN WHERE Username = ?');
+        $exists->execute([$username]);
+        $target = $exists->fetch();
+        if (!$target) json_error('Khong tim thay tai khoan.', 404);
+        if ($target['Role'] === 'Admin') protect_last_admin($conn, $username);
+        $stmt = $conn->prepare('DELETE FROM TAIKHOAN WHERE Username = ?');
         $stmt->execute([$username]);
-        
-        if ($stmt->rowCount() > 0) {
-            json_success([], "Xóa tài khoản $username thành công.");
-        } else {
-            json_error('Không tìm thấy tài khoản để xóa.', 404);
-        }
-    } catch (Exception $e) {
-        json_error('Lỗi hệ thống: Tài khoản này có thể đang liên kết với các dữ liệu khác.', 500);
-    }
+        json_success([], 'Da xoa tai khoan ' . $username . '.');
+        break;
+
+    default:
+        json_error('Phuong thuc khong hop le.', 405);
 }
-?>
+
+function valid_role($role) {
+    return in_array($role, ['User', 'Admin'], true) ? $role : null;
+}
+
+function protect_last_admin($conn, $username) {
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM TAIKHOAN WHERE Role = 'Admin' AND Username <> ?");
+    $stmt->execute([$username]);
+    if ((int)$stmt->fetchColumn() === 0) json_error('He thong phai co it nhat mot Admin.');
+}

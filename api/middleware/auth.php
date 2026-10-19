@@ -1,24 +1,13 @@
 <?php
 function require_auth() {
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+    if (empty($_SESSION['user_id'])) {
+        json_error('Phien dang nhap het han. Vui long dang nhap lai.', 401);
     }
 }
 
 function require_admin() {
     require_auth();
-    if ($_SESSION['user_role'] !== 'Admin') {
-        http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Không có quyền thực hiện thao tác này.'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+    if (($_SESSION['user_role'] ?? '') !== 'Admin') {
+        json_error('Ban khong co quyen thuc hien chuc nang nay.', 403);
     }
 }
-?>
