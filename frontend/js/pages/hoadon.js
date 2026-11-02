@@ -24,7 +24,7 @@ async function renderHoaDon() {
 
     // Build HD history table
     const hdRows = hds.length === 0
-        ? `<tr><td colspan="5" style="text-align:center">Chưa có hóa đơn nào</td></tr>`
+        ? UIComponents.EmptyStateRow(6, 'Chưa có hóa đơn bán hàng nào được lập.', 'fa-file-invoice-dollar')
         : hds.map(h => `
             <tr>
                 <td><span class="badge">HD${h.MaPhieuHoaDon}</span></td>
@@ -32,6 +32,7 @@ async function renderHoaDon() {
                 <td style="font-weight:500">${escapeHtml(h.HoTenKhachHang) || '<span style="color:var(--text-muted)">Không rõ</span>'}</td>
                 <td>${escapeHtml(h.DanhSachSach) || '<span style="color:var(--text-muted)">Chưa có mặt hàng</span>'}</td>
                 <td><span class="badge info">${h.TongSoLuong || 0} cuốn</span></td>
+                <td style="color:var(--secondary);font-weight:600">${fmt(h.TongTien || 0)}đ</td>
             </tr>
         `).join('');
 
@@ -97,6 +98,7 @@ async function renderHoaDon() {
                             <th>Khách hàng</th>
                             <th>Mặt hàng</th>
                             <th>Tổng SL</th>
+                            <th>Tổng Tiền</th>
                         </tr>
                     </thead>
                     <tbody>${hdRows}</tbody>

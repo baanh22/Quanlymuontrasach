@@ -1,0 +1,103 @@
+@startuml QuanLyNhaSach_Sequence_Diagram
+autonumber
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+skinparam SequenceMessageAlign center
+
+actor "Nhân Viên / Admin" as User
+boundary "SPA Frontend\n(hoadon.js / api.js)" as UI
+control "HoaDonController\n(api/hoadon.php)" as Ctrl
+control "AuthMiddleware\n(middleware/auth.php)" as Auth
+control "HoaDonService\n(services/HoaDonService.php)" as Svc
+entity "ThamSoRepository" as ThamSoRepo
+entity "KhachHangRepository" as KHRepo
+entity "SachRepository" as SachRepo
+entity "HoaDonRepository" as HDRepo
+database "MySQL Database\n(QuanLyNhaSach)" as DB
+
+title Sơ Đồ Tuần Tự (Sequence Diagram): Luồng API Lập Hóa Đơn Bán Sách (Tuân Thủ QĐ2 & ACID Transaction)
+
+User -> UI : Chọn Khách hàng, Sách, nhập Số lượng bán & nhấn "Xác nhận"
+activate UI
+UI -> Ctrl : POST /api/hoadon.php\n{MaKhachHang, MaSach, SoLuong}
+activate Ctrl
+
+Ctrl -> Auth : require_auth()
+activate Auth
+Auth --> Ctrl : Session hợp lệ (user_id, role)
+deactivate Auth
+
+Ctrl -> Svc : createHoaDon(MaKhachHang, MaSach, SoLuong)
+activate Svc
+
+Svc -> DB : beginTransaction()
+activate DB
+
+Svc -> ThamSoRepo : getThamSo()
+activate ThamSoRepo
+ThamSoRepo -> DB : SELECT * FROM THAMSO LIMIT 1
+DB --> ThamSoRepo : {SoTienNoToiDa: 20000, SoLuongTonSauToiThieu: 20, DonGiaBanYeuCau: 1.05}
+ThamSoRepo --> Svc : $thamSo
+deactivate ThamSoRepo
+
+Svc -> KHRepo : findByIdForUpdate(MaKhachHang)
+activate KHRepo
+KHRepo -> DB : SELECT * FROM KHACHHANG WHERE MaKhachHang = ? FOR UPDATE
+DB --> KHRepo : $khachHang
+KHRepo --> Svc : $khachHang
+deactivate KHRepo
+
+alt Khách hàng không tồn tại hoặc SoTienNo > SoTienNoToiDa (Vi phạm QĐ2.1)
+    Svc -> DB : rollBack()
+    Svc --> Ctrl : throw BusinessException("Khách hàng nợ vượt định mức QĐ2")
+    Ctrl --> UI : HTTP 400 Bad Request {success: false, message: "..."}
+    UI --> User : Hiển thị Alert lỗi màu đỏ
+else Khách hàng đủ điều kiện mua hàng
+    Svc -> SachRepo : findByIdForUpdate(MaSach)
+    activate SachRepo
+    SachRepo -> DB : SELECT * FROM SACH WHERE MaSach = ? FOR UPDATE
+    DB --> SachRepo : $sach
+    SachRepo --> Svc : $sach
+    deactivate SachRepo
+
+    alt (SoLuongTon - SoLuong) < SoLuongTonSauToiThieu (Vi phạm QĐ2.2)
+        Svc -> DB : rollBack()
+        Svc --> Ctrl : throw BusinessException("Tồn kho sau bán nhỏ hơn mức tối thiểu QĐ2")
+        Ctrl --> UI : HTTP 400 Bad Request {success: false, message: "..."}
+        UI --> User : Hiển thị Alert lỗi tồn kho
+    else Đủ điều kiện tồn kho
+        Svc -> Svc : Tính Giá bán = DonGia * DonGiaBanYeuCau\nTổng tiền = Giá bán * SoLuong
+        
+        Svc -> HDRepo : insertHoaDon(MaKhachHang, MaSach, SoLuong, GiaBan)
+        activate HDRepo
+        HDRepo -> DB : INSERT INTO PHIEUHOADON (NgayLapHoaDon, MaKhachHang) VALUES (NOW(), ?)
+        DB --> HDRepo : $maPhieuHoaDon
+        HDRepo -> DB : INSERT INTO CHITIETPHIEUHOADON (MaPhieuHoaDon, MaSach, SoLuongBan, DonGiaBan) VALUES (?, ?, ?, ?)
+        HDRepo --> Svc : $maPhieuHoaDon
+        deactivate HDRepo
+
+        Svc -> SachRepo : decreaseStock(MaSach, SoLuong)
+        activate SachRepo
+        SachRepo -> DB : UPDATE SACH SET SoLuongTon = SoLuongTon - ? WHERE MaSach = ?
+        SachRepo --> Svc : OK
+        deactivate SachRepo
+
+        Svc -> KHRepo : increaseDebt(MaKhachHang, TongTien)
+        activate KHRepo
+        KHRepo -> DB : UPDATE KHACHHANG SET SoTienNo = SoTienNo + ? WHERE MaKhachHang = ?
+        KHRepo --> Svc : OK
+        deactivate KHRepo
+
+        Svc -> DB : commit()
+        deactivate DB
+
+        Svc --> Ctrl : return {MaPhieuHoaDon, TongTien, GiaBan}
+        deactivate Svc
+        Ctrl --> UI : HTTP 200 OK {success: true, data: {...}, message: "Lập hóa đơn thành công!"}
+        deactivate Ctrl
+        UI --> User : Hiển thị thông báo thành công & làm mới bảng lịch sử
+        deactivate UI
+    end
+end
+@enduml
+

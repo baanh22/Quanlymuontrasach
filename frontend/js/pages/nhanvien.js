@@ -181,8 +181,9 @@ async function submitNhanVien(mode, id = '') {
         loadNhanVien();
         
         // Nếu user tự đổi tên của chính mình thì cập nhật lại chữ hiển thị trên góc
-        if (mode === 'edit' && id === document.getElementById('user-name').dataset.username) {
-            document.getElementById('user-name').textContent = data.FullName;
+        const userNameEl = document.getElementById('userName');
+        if (mode === 'edit' && userNameEl && id === userNameEl.dataset.username) {
+            userNameEl.textContent = data.FullName;
         }
     } else {
         err.classList.remove('alert-hidden');

@@ -1,11 +1,11 @@
 -- ============================================
--- SCRIPT TẠO CSDL VÀ DỮ LIỆU MẪU: QUẢN LÝ NHÀ SÁCH
+-- SCRIPT TẠO CSDL VÀ DỮ LIỆU MẪU: QUẢN LÝ NHÀ SÁCH (v2.0 - Chuẩn Hóa & Indexing)
 -- ============================================
 
 CREATE DATABASE IF NOT EXISTS `QuanLyNhaSach` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `QuanLyNhaSach`;
 
--- 1. Bảng TAIKHOAN
+-- 1. Xóa bảng theo thứ tự khóa ngoại (Foreign Key Dependency Order)
 DROP TABLE IF EXISTS `CHITIETPHIEUHOADON`;
 DROP TABLE IF EXISTS `CHITIETPHIEUNHAP`;
 DROP TABLE IF EXISTS `PHIEUHOADON`;
@@ -16,15 +16,17 @@ DROP TABLE IF EXISTS `KHACHHANG`;
 DROP TABLE IF EXISTS `THAMSO`;
 DROP TABLE IF EXISTS `TAIKHOAN`;
 
+-- 1. Bảng TAIKHOAN
 CREATE TABLE `TAIKHOAN` (
   `Username` varchar(50) NOT NULL,
   `Password` varchar(255) NOT NULL,
   `FullName` varchar(100) NOT NULL,
   `Role` varchar(20) NOT NULL DEFAULT 'User',
-  PRIMARY KEY (`Username`)
+  PRIMARY KEY (`Username`),
+  KEY `IDX_TAIKHOAN_ROLE` (`Role`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Bảng THAMSO
+-- 2. Bảng THAMSO (Lưu trữ 4 Quy định QĐ1 - QĐ4)
 CREATE TABLE `THAMSO` (
   `SoLuongNhapItNhat` int(11) NOT NULL DEFAULT 150,
   `SoLuongTonToiDaTruocNhap` int(11) NOT NULL DEFAULT 300,
@@ -42,7 +44,9 @@ CREATE TABLE `SACH` (
   `TacGia` varchar(100) DEFAULT NULL,
   `SoLuongTon` int(11) NOT NULL DEFAULT 0,
   `DonGia` decimal(15,2) NOT NULL DEFAULT 0.00,
-  PRIMARY KEY (`MaSach`)
+  PRIMARY KEY (`MaSach`),
+  KEY `IDX_SACH_TENSACH` (`TenSach`),
+  KEY `IDX_SACH_TONKHO` (`SoLuongTon`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Bảng KHACHHANG
@@ -53,14 +57,17 @@ CREATE TABLE `KHACHHANG` (
   `DienThoai` varchar(20) DEFAULT NULL,
   `Email` varchar(100) DEFAULT NULL,
   `SoTienNo` decimal(15,2) NOT NULL DEFAULT 0.00,
-  PRIMARY KEY (`MaKhachHang`)
+  PRIMARY KEY (`MaKhachHang`),
+  KEY `IDX_KH_HOTEN` (`HoTenKhachHang`),
+  KEY `IDX_KH_DIENTHOAI` (`DienThoai`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. Bảng PHIEUNHAP
 CREATE TABLE `PHIEUNHAP` (
   `MaPhieuNhap` int(11) NOT NULL AUTO_INCREMENT,
   `NgayNhap` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`MaPhieuNhap`)
+  PRIMARY KEY (`MaPhieuNhap`),
+  KEY `IDX_PN_NGAYNHAP` (`NgayNhap`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. Bảng CHITIETPHIEUNHAP
@@ -82,14 +89,16 @@ CREATE TABLE `PHIEUHOADON` (
   `MaKhachHang` varchar(20) NOT NULL,
   PRIMARY KEY (`MaPhieuHoaDon`),
   KEY `FK_HD_KH` (`MaKhachHang`),
+  KEY `IDX_HD_NGAYLAP` (`NgayLapHoaDon`),
   CONSTRAINT `FK_HD_KH` FOREIGN KEY (`MaKhachHang`) REFERENCES `KHACHHANG` (`MaKhachHang`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 8. Bảng CHITIETPHIEUHOADON
+-- 8. Bảng CHITIETPHIEUHOADON (Bổ sung DonGiaBan để lưu vết lịch sử giá bán chính xác)
 CREATE TABLE `CHITIETPHIEUHOADON` (
   `MaPhieuHoaDon` int(11) NOT NULL,
   `MaSach` varchar(20) NOT NULL,
   `SoLuongBan` int(11) NOT NULL,
+  `DonGiaBan` decimal(15,2) NOT NULL DEFAULT 0.00,
   PRIMARY KEY (`MaPhieuHoaDon`,`MaSach`),
   KEY `FK_CTHD_SACH` (`MaSach`),
   CONSTRAINT `FK_CTHD_HD` FOREIGN KEY (`MaPhieuHoaDon`) REFERENCES `PHIEUHOADON` (`MaPhieuHoaDon`) ON DELETE CASCADE,
@@ -104,6 +113,7 @@ CREATE TABLE `PHIEUTHUTIEN` (
   `SoTienThu` decimal(15,2) NOT NULL,
   PRIMARY KEY (`MaPhieuThu`),
   KEY `FK_PT_KH` (`MaKhachHang`),
+  KEY `IDX_PT_NGAYTHU` (`NgayThuTien`),
   CONSTRAINT `FK_PT_KH` FOREIGN KEY (`MaKhachHang`) REFERENCES `KHACHHANG` (`MaKhachHang`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -116,8 +126,9 @@ INSERT INTO `THAMSO` (`SoLuongNhapItNhat`, `SoLuongTonToiDaTruocNhap`, `SoTienNo
 VALUES (150, 300, 20000.00, 20, 1.05, 1);
 
 -- Thêm Tài khoản đăng nhập:
--- admin / admin (MD5: 21232f297a57a5a743894a0e4a801fc3)
--- nhanvien / 123456 (MD5: e10adc3949ba59abbe56e057f20f883e)
+-- Hỗ trợ cả Bcrypt và MD5 (Tự động nâng cấp lên Bcrypt khi đăng nhập):
+-- admin / admin
+-- nhanvien / 123456
 INSERT INTO `TAIKHOAN` (`Username`, `Password`, `FullName`, `Role`) VALUES
 ('admin', '21232f297a57a5a743894a0e4a801fc3', 'Quản Trị Viên', 'Admin'),
 ('nhanvien', 'e10adc3949ba59abbe56e057f20f883e', 'Trần Văn An', 'User');

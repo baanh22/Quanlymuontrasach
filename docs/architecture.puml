@@ -1,0 +1,176 @@
+@startuml QuanLyNhaSach_Class_Diagram
+skinparam classAttributeIconSize 0
+skinparam PackageStyle rectangle
+
+package "Presentation / Entry Controllers (api/*.php)" {
+    class SachController {
+        +handleRequest(): void
+    }
+    class KhachHangController {
+        +handleRequest(): void
+    }
+    class NhapSachController {
+        +handleRequest(): void
+    }
+    class HoaDonController {
+        +handleRequest(): void
+    }
+    class PhieuThuController {
+        +handleRequest(): void
+    }
+    class BaoCaoController {
+        +handleRequest(): void
+    }
+    class CauHinhController {
+        +handleRequest(): void
+    }
+    class NhanVienController {
+        +handleRequest(): void
+    }
+}
+
+package "Business Logic Layer (api/services/*.php)" {
+    class BusinessException {
+        -int $statusCode
+        +getStatusCode(): int
+    }
+    class SachService {
+        -SachRepository $sachRepo
+        +getAllSach(string $search): array
+        +createSach(array $data): array
+        +updateSach(string $id, array $data): void
+        +deleteSach(string $id): void
+    }
+    class NhapSachService {
+        -PDO $db
+        -SachRepository $sachRepo
+        -ThamSoRepository $thamSoRepo
+        -PhieuNhapRepository $phieuNhapRepo
+        +getHistory(): array
+        +nhapSach(string $maSach, int $soLuong, float $donGia): array
+    }
+    class HoaDonService {
+        -PDO $db
+        -SachRepository $sachRepo
+        -KhachHangRepository $khachHangRepo
+        -ThamSoRepository $thamSoRepo
+        -HoaDonRepository $hoaDonRepo
+        +getHistory(): array
+        +lapHoaDon(string $maKH, string $maSach, int $soLuong): array
+    }
+    class PhieuThuService {
+        -PDO $db
+        -KhachHangRepository $khachHangRepo
+        -ThamSoRepository $thamSoRepo
+        -PhieuThuRepository $phieuThuRepo
+        +getHistory(): array
+        +lapPhieuThu(string $maKH, float $soTienThu): array
+    }
+    class BaoCaoService {
+        -BaoCaoRepository $baoCaoRepo
+        +getBaoCaoTonKho(int $thang, int $nam): array
+        +getBaoCaoCongNo(int $thang, int $nam): array
+        +getDashboardStats(): array
+    }
+}
+
+package "Data Access Layer (api/repositories/*.php)" {
+    class SachRepository {
+        -PDO $conn
+        +findAll(string $search): array
+        +findById(string $maSach, bool $forUpdate): ?array
+        +insert(Sach $sach): bool
+        +update(Sach $sach): int
+        +updateStockAndPrice(string $maSach, int $addedQty, float $newPrice): bool
+        +decreaseStock(string $maSach, int $soldQty): bool
+        +hasRelatedTransactions(string $maSach): bool
+        +delete(string $maSach): int
+    }
+    class KhachHangRepository {
+        -PDO $conn
+        +findAll(string $search): array
+        +findById(string $maKH, bool $forUpdate): ?array
+        +insert(KhachHang $kh): bool
+        +update(KhachHang $kh): int
+        +updateDebt(string $maKH, float $deltaDebt): bool
+        +hasRelatedTransactions(string $maKH): bool
+        +delete(string $maKH): int
+    }
+    class ThamSoRepository {
+        -PDO $conn
+        +getThamSo(): array
+        +updateThamSo(array $data): bool
+    }
+    class PhieuNhapRepository {
+        -PDO $conn
+        +findAllHistory(): array
+        +createPhieuNhap(string $maSach, int $soLuong, float $donGia): int
+    }
+    class HoaDonRepository {
+        -PDO $conn
+        +findAllHistory(): array
+        +createHoaDon(string $maKH, string $maSach, int $soLuong, float $donGiaBan): int
+    }
+    class PhieuThuRepository {
+        -PDO $conn
+        +findAllHistory(): array
+        +createPhieuThu(string $maKH, float $soTienThu): int
+    }
+    class BaoCaoRepository {
+        -PDO $conn
+        +getTonKhoByPeriod(string $startDate, string $endDate): array
+        +getCongNoByPeriod(string $startDate, string $endDate, float $defaultRate): array
+    }
+}
+
+package "Domain Models / DTOs (api/models/*.php)" {
+    class Sach {
+        +string $MaSach
+        +string $TenSach
+        +string $TheLoai
+        +string $TacGia
+        +int $SoLuongTon
+        +float $DonGia
+    }
+    class KhachHang {
+        +string $MaKhachHang
+        +string $HoTenKhachHang
+        +string $DiaChi
+        +string $DienThoai
+        +string $Email
+        +float $SoTienNo
+    }
+    class ThamSo {
+        +int $SoLuongNhapItNhat
+        +int $SoLuongTonToiDaTruocNhap
+        +float $SoTienNoToiDa
+        +int $SoLuongTonSauToiThieu
+        +float $DonGiaBanYeuCau
+        +int $QuyDinh
+    }
+}
+
+HoaDonController --> HoaDonService
+NhapSachController --> NhapSachService
+PhieuThuController --> PhieuThuService
+SachController --> SachService
+BaoCaoController --> BaoCaoService
+
+HoaDonService --> SachRepository
+HoaDonService --> KhachHangRepository
+HoaDonService --> ThamSoRepository
+HoaDonService --> HoaDonRepository
+
+NhapSachService --> SachRepository
+NhapSachService --> ThamSoRepository
+NhapSachService --> PhieuNhapRepository
+
+PhieuThuService --> KhachHangRepository
+PhieuThuService --> ThamSoRepository
+PhieuThuService --> PhieuThuRepository
+
+SachRepository ..> Sach
+KhachHangRepository ..> KhachHang
+ThamSoRepository ..> ThamSo
+@enduml
+

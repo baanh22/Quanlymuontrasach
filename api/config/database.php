@@ -11,11 +11,11 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
     exit();
 }
 
-if (session_status() === PHP_SESSION_NONE) {
+if (session_status() === PHP_SESSION_NONE && php_sapi_name() !== 'cli') {
     session_start();
 }
 
-// Cấu hình CSDL chạy trên XAMPP Localhost
+// Cấu hình kết nối CSDL MySQL trên XAMPP
 $host = 'localhost';
 $user = 'root';
 $pass = '';
@@ -27,7 +27,7 @@ try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    // Dự phòng nếu root có đặt mật khẩu 'root'
+    // Dự phòng nếu MySQL đặt mật khẩu 'root'
     try {
         $conn = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4", $user, 'root');
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

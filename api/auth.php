@@ -1,73 +1,57 @@
 <?php
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
+require_once __DIR__ . '/services/AuthService.php';
 
+/**
+ * Controller: AuthController (api/auth.php)
+ * Đã khắc phục lỗi OWASP A02/A09: Xóa bỏ hoàn toàn việc ghi mật khẩu plaintext ra debug_login.txt
+ * và tích hợp Bcrypt Password Hashing.
+ */
 $action = $_GET['action'] ?? '';
+$authService = new AuthService($conn);
 
-switch ($action) {
-    case 'login':
-        handleLogin();
-        break;
-    case 'logout':
-        handleLogout();
-        break;
-    case 'me':
-        handleMe();
-        break;
-    default:
-        json_error('Action không hợp lệ', 404);
-}
+try {
+    switch ($action) {
+        case 'login':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                json_error('Phương thức không hợp lệ. Dùng POST.', 405);
+            }
+            $body = json_decode(file_get_contents('php://input'), true) ?? [];
+            $userData = $authService->login(
+                (string)($body['username'] ?? ''),
+                (string)($body['password'] ?? '')
+            );
 
-function handleLogin() {
-    global $conn;
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        json_error('Phương thức không hợp lệ. Dùng POST.', 405);
+            $_SESSION['user_id']   = $userData['username'];
+            $_SESSION['user_name'] = $userData['fullName'];
+            $_SESSION['user_role'] = $userData['role'];
+
+            json_success($userData, 'Đăng nhập thành công!');
+            break;
+
+        case 'logout':
+            session_destroy();
+            json_success([], 'Đăng xuất thành công.');
+            break;
+
+        case 'me':
+            if (!isset($_SESSION['user_id'])) {
+                json_error('Chưa đăng nhập.', 401);
+            }
+            json_success([
+                'username' => $_SESSION['user_id'],
+                'fullName' => $_SESSION['user_name'],
+                'role'     => $_SESSION['user_role'],
+            ]);
+            break;
+
+        default:
+            json_error('Action không hợp lệ', 404);
     }
-
-    $raw = file_get_contents('php://input');
-    file_put_contents(__DIR__ . '/debug_login.txt', date('Y-m-d H:i:s') . " - RAW: " . $raw . "\n", FILE_APPEND);
-
-    $body = json_decode($raw, true);
-    $username = trim($body['username'] ?? '');
-    $password = trim($body['password'] ?? '');
-
-    if (!$username || !$password) {
-        json_error('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
-    }
-
-    $stmt = $conn->prepare("SELECT * FROM TAIKHOAN WHERE Username = ?");
-    $stmt->execute([$username]);
-    $user = $stmt->fetch();
-
-    // So sánh MD5 (đang dùng md5 theo database.sql)
-    if (!$user || $user['Password'] !== md5($password)) {
-        json_error('Tên đăng nhập hoặc mật khẩu không đúng.', 401);
-    }
-
-    $_SESSION['user_id']   = $user['Username'];
-    $_SESSION['user_name'] = $user['FullName'];
-    $_SESSION['user_role'] = $user['Role'];
-
-    json_success([
-        'username' => $user['Username'],
-        'fullName' => $user['FullName'],
-        'role'     => $user['Role'],
-    ], 'Đăng nhập thành công!');
-}
-
-function handleLogout() {
-    session_destroy();
-    json_success([], 'Đăng xuất thành công.');
-}
-
-function handleMe() {
-    if (!isset($_SESSION['user_id'])) {
-        json_error('Chưa đăng nhập.', 401);
-    }
-    json_success([
-        'username' => $_SESSION['user_id'],
-        'fullName' => $_SESSION['user_name'],
-        'role'     => $_SESSION['user_role'],
-    ]);
+} catch (BusinessException $be) {
+    json_error($be->getMessage(), $be->getStatusCode());
+} catch (Exception $e) {
+    json_error('Lỗi hệ thống: ' . $e->getMessage(), 500);
 }
 ?>

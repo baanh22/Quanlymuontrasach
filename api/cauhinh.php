@@ -1,38 +1,36 @@
 <?php
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
+require_once __DIR__ . '/services/HeThongBaoCaoService.php';
+
+/**
+ * Controller: CauHinhController (api/cauhinh.php)
+ * Thực thi QĐ4: Cho phép xem tham số (mọi nhân viên) và cập nhật tham số (chỉ Admin - RBAC)
+ */
 require_auth();
 
-$method = $_SERVER['REQUEST_METHOD'];
+$method  = $_SERVER['REQUEST_METHOD'];
+$service = new HeThongBaoCaoService($conn);
 
-switch ($method) {
-    case 'GET': getCauHinh();    break;
-    case 'PUT': updateCauHinh(); break;
-    default: json_error('Phương thức không hợp lệ', 405);
-}
+try {
+    switch ($method) {
+        case 'GET':
+            json_success($service->getCauHinh());
+            break;
 
-function getCauHinh() {
-    global $conn;
-    $thamso = $conn->query("SELECT * FROM THAMSO LIMIT 1")->fetch();
-    json_success($thamso);
-}
+        case 'PUT':
+            require_admin();
+            $body = json_decode(file_get_contents('php://input'), true) ?? [];
+            $service->updateCauHinh($body);
+            json_success([], 'Cập nhật tham số quy định thành công!');
+            break;
 
-function updateCauHinh() {
-    global $conn;
-    $body = json_decode(file_get_contents('php://input'), true);
-
-    $soLuongNhapItNhat       = (int)($body['SoLuongNhapItNhat']       ?? 0);
-    $soLuongTonToiDaTruocNhap = (int)($body['SoLuongTonToiDaTruocNhap'] ?? 0);
-    $soTienNoToiDa           = (float)($body['SoTienNoToiDa']          ?? 0);
-    $soLuongTonSauToiThieu   = (int)($body['SoLuongTonSauToiThieu']   ?? 0);
-
-    if ($soLuongNhapItNhat <= 0 || $soLuongTonToiDaTruocNhap <= 0 || $soTienNoToiDa <= 0 || $soLuongTonSauToiThieu < 0) {
-        json_error('Các tham số phải là số hợp lệ và lớn hơn 0.');
+        default:
+            json_error('Phương thức không hợp lệ', 405);
     }
-
-    $stmt = $conn->prepare("UPDATE THAMSO SET SoLuongNhapItNhat=?, SoLuongTonToiDaTruocNhap=?, SoTienNoToiDa=?, SoLuongTonSauToiThieu=?");
-    $stmt->execute([$soLuongNhapItNhat, $soLuongTonToiDaTruocNhap, $soTienNoToiDa, $soLuongTonSauToiThieu]);
-
-    json_success([], 'Cập nhật tham số quy định thành công!');
+} catch (BusinessException $be) {
+    json_error($be->getMessage(), $be->getStatusCode());
+} catch (Exception $e) {
+    json_error('Lỗi hệ thống: ' . $e->getMessage(), 500);
 }
 ?>

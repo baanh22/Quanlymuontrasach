@@ -1,0 +1,14 @@
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Node / Test artifacts
+node_modules/
+playwright-report/
+test-results/
+
+# Logs & Temp
+*.log
+api/debug_*.txt
